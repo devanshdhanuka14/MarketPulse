@@ -19,6 +19,8 @@ from fastapi import Depends
 from app.models.database import get_db
 from app.services.cache import get_cached_result, store_result, log_search
 
+from app.models.tables import SearchHistory
+
 app = FastAPI(
     title="MarketPulse API",
     description="Financial news sentiment API for Indian Stocks",
@@ -138,3 +140,18 @@ def get_sentiment(ticker: str, db: Session = Depends(get_db)):
         "fetched_at": datetime.utcnow().isoformat(),
         "headlines": headlines_list
     }
+
+@app.get("/history")
+def get_history(db: Session = Depends(get_db)):
+    records = db.query(SearchHistory)\
+        .order_by(SearchHistory.queried_at.desc())\
+        .limit(20)\
+        .all()
+    return [
+        {
+            "ticker": r.ticker,
+            "queried_at": r.queried_at.isoformat(),
+            "result_label": r.result_label
+        }
+        for r in records
+    ]
