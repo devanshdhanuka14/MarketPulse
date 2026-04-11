@@ -5,12 +5,19 @@ from typing import List, Optional
 import yfinance as yf
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
+from app.services.news import fetch_news
+
 from app.services.ticker_map import get_company_names, is_relevant
 
 from app.models.database import engine
 from app.models import tables
-
 tables.Base.metadata.create_all(bind=engine)
+
+import json
+from sqlalchemy.orm import Session
+from fastapi import Depends
+from app.models.database import get_db
+from app.services.cache import get_cached_result, store_result, log_search
 
 app = FastAPI(
     title="MarketPulse API",
@@ -48,12 +55,29 @@ analyzer = SentimentIntensityAnalyzer()
 BULLISH_WORDS =["rally", "beats", "upgrade", "surges", "record", "profit", "growth", "buyback", "dividend", "expansion", "buys", "investment", "export", "high", "permits"]
 BEARISH_WORDS = ["slump", "miss", "downgrade", "falls", "loss", "weak", "concern", "probe", "debt", "resign", "fraud", "penalty", "fine", "lawsuit", "crash"]
 
-from app.services.news import fetch_news
 
 @app.get("/sentiment/{ticker}", response_model=SentimentResponse)
-def get_sentiment(ticker: str):
-    headlines, rss_used = fetch_news(ticker)
+def get_sentiment(ticker: str, db: Session = Depends(get_db)):
     
+    #Check cache first
+    cached = get_cached_result(ticker, db)
+    if cached:
+        log_search(ticker, cached.label, db)
+        return {
+            "ticker": cached.ticker,
+            "label": cached.label,
+            "score": cached.score,
+            "headline_count": cached.headline_count,
+            "low_confidence": cached.low_confidence,
+            "low_confidence_reason": "Fewer than 5 relevant headlines found" if cached.low_confidence else None,
+            "cached": True,
+            "fetched_at": cached.fetched_at.isoformat(),
+            "headlines": json.loads(cached.headlines_json)
+        }
+
+    #Fetch fresh news
+    headlines, rss_used = fetch_news(ticker)
+
     headlines_list = []
     total_score = 0.0
 
@@ -96,13 +120,20 @@ def get_sentiment(ticker: str):
     else:
         overall_label = "Neutral"
 
+    low_confidence = article_count < 5
+
+    #Store in cache and log
+    store_result(ticker, overall_label, avg_score, article_count,
+                 low_confidence, headlines_list, db)
+    log_search(ticker, overall_label, db)
+
     return {
         "ticker": ticker.upper(),
         "label": overall_label,
         "score": avg_score,
         "headline_count": article_count,
-        "low_confidence": article_count < 5,
-        "low_confidence_reason": "Fewer than 5 relevant headlines found" if article_count < 5 else None,
+        "low_confidence": low_confidence,
+        "low_confidence_reason": "Fewer than 5 relevant headlines found" if low_confidence else None,
         "cached": False,
         "fetched_at": datetime.utcnow().isoformat(),
         "headlines": headlines_list
