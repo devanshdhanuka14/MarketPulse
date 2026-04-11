@@ -7,6 +7,10 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 from app.services.ticker_map import get_company_names, is_relevant
 
+from app.models.database import engine
+from app.models import tables
+
+tables.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="MarketPulse API",
