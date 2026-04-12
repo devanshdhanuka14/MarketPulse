@@ -24,6 +24,11 @@ TICKER_MAP = {
     "NYKAA.NS": ["Nykaa", "FSN"],
     "DMART.NS": ["DMart", "Avenue Supermarts"],
     "ULTRACEMCO.NS": ["UltraTech", "UltraTech Cement"],
+    "LT.NS": ["Larsen & Toubro", "L&T", "Larsen and Toubro"],
+    "HCLTECH.NS": ["HCL Technologies", "HCL Tech", "HCL"],
+    "TECHM.NS": ["Tech Mahindra", "TechM"],
+    "BAJFINANCE.NS": ["Bajaj Finance", "BAF"],
+    "KOTAKBANK.NS": ["Kotak Mahindra", "Kotak Bank", "Kotak"],
 }
 
 import yfinance as yf
@@ -44,7 +49,7 @@ def get_company_names(ticker: str) -> list:
             names.append(long_name)
             # Add first word as shorthand e.g. "Tata" from "Tata Communications"
             first_word = long_name.split()[0]
-            if len(first_word) > 3:
+            if len(first_word) > 4:
                 names.append(first_word)
         if short_name and short_name not in names:
             names.append(short_name)
