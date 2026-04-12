@@ -26,8 +26,33 @@ TICKER_MAP = {
     "ULTRACEMCO.NS": ["UltraTech", "UltraTech Cement"],
 }
 
-def get_company_names(ticker: str):
-    return TICKER_MAP.get(ticker.upper(), [ticker.split(".")[0]])
+import yfinance as yf
+
+def get_company_names(ticker: str) -> list:
+    # Check hardcoded map first
+    names = TICKER_MAP.get(ticker.upper())
+    if names:
+        return names
+
+    # Unknown ticker — fetch from yfinance
+    try:
+        info = yf.Ticker(ticker).info
+        long_name = info.get("longName", "")
+        short_name = info.get("shortName", "")
+        names = []
+        if long_name:
+            names.append(long_name)
+            # Add first word as shorthand e.g. "Tata" from "Tata Communications"
+            first_word = long_name.split()[0]
+            if len(first_word) > 3:
+                names.append(first_word)
+        if short_name and short_name not in names:
+            names.append(short_name)
+        # Always add raw ticker as fallback
+        names.append(ticker.split(".")[0])
+        return names if names else [ticker.split(".")[0]]
+    except:
+        return [ticker.split(".")[0]]
 
 def is_relevant(headline: str, ticker: str) -> bool:
     names = get_company_names(ticker)
