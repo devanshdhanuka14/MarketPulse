@@ -13,6 +13,10 @@ router = APIRouter()
 @router.get("/sentiment/{ticker}", response_model=SentimentResponse)
 def get_sentiment(ticker: str, db: Session = Depends(get_db)):
 
+    if "." not in ticker:
+        ticker = ticker + ".NS"
+    ticker = ticker.upper()
+    
     cached = get_cached_result(ticker, db)
     if cached:
         log_search(ticker, cached.label, db)
